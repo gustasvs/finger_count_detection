@@ -11,12 +11,12 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 print_debug_info = True
 
 # hparams
-BATCH_SIZE = 8
-EPOCHS = 30
-LR = 0.005
+BATCH_SIZE = 6
+EPOCHS = 15
+LR = 0.01
 
 # image params
-image_size = 100
+image_size = 80
 gray_scale = False
 
 
@@ -71,23 +71,22 @@ def laod_images(folder_path, target_size=(700, 700)):
     
     return tf.data.Dataset.from_tensor_slices((images, labels))
 
-
 # Load datasets
 train_dataset = laod_images('rokas_train', target_size=(image_size, image_size))
 validate_dataset = laod_images('rokas_validate', target_size=(image_size, image_size))
 
-train_dataset = train_dataset.shuffle(buffer_size=200)
+train_dataset = train_dataset.shuffle(buffer_size=600)
 
 # print one example
-for img, label in train_dataset.take(1):
-    print("Image shape:", img.shape)
-    print("Label:", label)
-    # plt.imshow(img.numpy().astype('uint8'), cmap='gray')
-    plt.title(f"Label: {label}")
-    plt.axis('off')
-    plt.imshow(img.numpy().squeeze(), cmap='gray', vmin=0, vmax=1)
-    plt.colorbar() 
-    plt.show()
+# for img, label in train_dataset.take(1):
+#     print("Image shape:", img.shape)
+#     print("Label:", label)
+#     # plt.imshow(img.numpy().astype('uint8'), cmap='gray')
+#     plt.title(f"Label: {label}")
+#     plt.axis('off')
+#     plt.imshow(img.numpy().squeeze(), cmap='gray', vmin=0, vmax=1)
+#     plt.colorbar() 
+#     plt.show()
 
 # count labels function
 def count_labels(dataset):
@@ -128,7 +127,7 @@ model = Sequential([
     # Dropout(0.25),
 
     # Flatten(),
-    Dense(128, activation='relu'),
+    Dense(256, activation='relu'),
     Dropout(0.5),
     Dense(5, activation='softmax')
 ])
@@ -136,7 +135,8 @@ model = Sequential([
 optimizer = Adam(learning_rate=LR, beta_1=0.9, beta_2=0.98, epsilon=1e-9)
 model.compile(optimizer="adam", 
               loss='categorical_crossentropy',
-               metrics=['accuracy', F1Score(num_classes=5, average='macro')])
+              metrics=['accuracy', F1Score(num_classes=5, average='macro')])
+
 
 # simple model for testing that returns random image
 def model_predict_test():
@@ -151,6 +151,68 @@ plt.ylabel('Loss')
 plt.xlabel('Epoch')
 plt.legend()
 plt.show()
+
+
+import cv2
+import numpy as np
+import matplotlib.pyplot as plt
+
+# 0 for primary cam
+cap = cv2.VideoCapture(0)
+
+fig, ax = plt.subplots()
+bars = ax.bar(range(1, 6), np.zeros(5), color='blue', width=0.5)
+ax.set_ylim(0, 1)
+plt.ion() # interactive mode on
+plt.show()
+
+def softmax(x):
+    res = []
+    # exponentionally scale each
+    for i in x:
+        res.append(i * i)
+    res_max = max(res)
+    for i in range(len(res)):
+        res[i] = res[i] / res_max
+    return res
+
+while True:
+    ret, frame = cap.read()
+
+    if not ret:
+        break  # Break the loop if no frame is captured
+    # model_prediction = model.predict(preprocess_image(frame, (image_size, image_size))), batch_size=1)[0]
+    # prediction = np.argmax(model_prediction) + 1
+    prediction = model.predict(
+        np.expand_dims(
+            preprocess_image(frame, (image_size, image_size)), 
+            axis=0), verbose=0)[0]
+    
+    prediction = softmax(prediction)
+
+    highest_pred_index = np.argmax(prediction)
+    
+    for i, (bar, pred) in enumerate(zip(bars, prediction)):
+        bar.set_height(pred)
+        
+        if i == highest_pred_index:
+            bar.set_color('red')
+        else:
+            bar.set_color('black')
+    
+    fig.canvas.draw()
+    fig.canvas.flush_events()
+
+    cv2.imshow('Video', frame)
+    
+    # Break the loop if 'q' is pressed
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+# Release the capture and close the plot
+cap.release()
+cv2.destroyAllWindows()
+plt.close()
 
 
 # test the model, make a prediction and display the image

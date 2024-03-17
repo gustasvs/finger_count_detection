@@ -6,8 +6,8 @@ import matplotlib.pyplot as plt
 import sys
 
 from hparams import BATCH_SIZE, EPOCHS, LR, image_size, gray_scale
-
 from video_interface import video_interface
+from functions import preprocess_image
 
 # printoptions for easier debugging
 np.set_printoptions(suppress=True, precision=2)
@@ -35,21 +35,26 @@ def laod_images(folder_path, target_size=(700, 700)):
     return tf.data.Dataset.from_tensor_slices((images, labels))
 
 # Load datasets
-train_dataset = laod_images('rokas_train', target_size=(image_size, image_size))
+train_dataset = laod_images('rokas_train', target_size=(image_size, image_size)).shuffle(buffer_size=600)
 validate_dataset = laod_images('rokas_validate', target_size=(image_size, image_size))
 
-train_dataset = train_dataset.shuffle(buffer_size=600)
 
-# print one example
-# for img, label in train_dataset.take(1):
-#     print("Image shape:", img.shape)
-#     print("Label:", label)
-#     # plt.imshow(img.numpy().astype('uint8'), cmap='gray')
-#     plt.title(f"Label: {label}")
-#     plt.axis('off')
-#     plt.imshow(img.numpy().squeeze(), cmap='gray', vmin=0, vmax=1)
-#     plt.colorbar() 
-#     plt.show()
+example_count = 1  # how many examples are displayed for each label
+
+for label in range(5):
+    filtered_dataset = train_dataset.filter(lambda x, y: tf.argmax(y) == label)
+    for img, lbl in filtered_dataset.take(example_count):
+        print("Image shape:", img.shape)
+        print("Label:", lbl)
+        plt.figure(figsize=(2, 2))
+        plt.title(f"Label: {np.argmax(lbl)+1}")
+        plt.axis('off')
+        if gray_scale:
+            plt.imshow(img.numpy().squeeze(), cmap='gray', vmin=0, vmax=1)
+        else:
+            plt.imshow(img.numpy().astype('uint8'))
+        plt.show()
+
 
 # count labels function
 def count_labels(dataset):
@@ -58,7 +63,6 @@ def count_labels(dataset):
         label = np.argmax(label) + 1
         label_counts[label] += 1
     return label_counts
-
 print("Train label counts:", count_labels(train_dataset))
 print("Validate label counts:", count_labels(validate_dataset))
 
@@ -95,8 +99,7 @@ model = Sequential([
     Dense(5, activation='softmax')
 ])
 
-optimizer = Adam(learning_rate=LR, beta_1=0.9, beta_2=0.98, epsilon=1e-9)
-model.compile(optimizer="adam", 
+model.compile(optimizer=Adam(learning_rate=LR, beta_1=0.9, beta_2=0.98, epsilon=1e-9),
               loss='categorical_crossentropy',
               metrics=['accuracy', F1Score(num_classes=5, average='macro')])
 
@@ -104,6 +107,39 @@ model.compile(optimizer="adam",
 # simple model for testing that returns random image
 def model_predict_test():
     return random.choice([1, 2, 3, 4, 5])
+
+def display_image_prediction(image, true_label, predicted_label):
+    plt.imshow(image.numpy().squeeze(), cmap='gray' if gray_scale else None)
+    plt.title(f"True: {true_label+1}, Pred: {predicted_label+1}")
+    plt.axis('off')
+    plt.show()
+
+# Apply placeholder model to a batch of the validation dataset and display results
+def evaluate_and_display_results(dataset, num_samples=5):
+    incorrect_predictions = {label: [] for label in range(5)}  # For error analysis
+    sample_count = 0
+
+    for img, true_label in dataset.take(num_samples):
+        predicted_label = model_predict_test()
+        true_label = np.argmax(true_label.numpy())  # Convert one-hot to integer label
+        display_image_prediction(img, true_label, predicted_label)
+
+        # Check for incorrect predictions and store them for error analysis
+        if true_label != predicted_label:
+            incorrect_predictions[true_label].append((img, true_label, predicted_label))
+        
+        sample_count += 1
+        if sample_count >= num_samples:
+            break
+
+    # Error analysis: display incorrect predictions for each label category
+    for label, predictions in incorrect_predictions.items():
+        print(f"Incorrect predictions for label {label+1}:")
+        for img, true_label, predicted_label in predictions:
+            display_image_prediction(img, true_label, predicted_label)
+
+# Run evaluation and display results
+evaluate_and_display_results(validate_dataset.batch(1), num_samples=10)
 
 history = model.fit(train_dataset.batch(BATCH_SIZE), 
                     epochs=EPOCHS, validation_data=validate_dataset.batch(BATCH_SIZE))

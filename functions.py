@@ -1,6 +1,7 @@
 import tensorflow as tf
-def preprocess_image(img, target_size=(700, 700), gray_scale=False):
-    # Determine the scale factor to make the smallest edge equal to the target size
+def preprocess_image(img, target_size=(700, 700), gray_scale=False, single=False):
+    images = []
+    
     original_shape = tf.cast(tf.shape(img)[:2], tf.float32)
     min_edge = tf.reduce_min(original_shape)
     scale_factor = target_size[0] / min_edge
@@ -13,4 +14,11 @@ def preprocess_image(img, target_size=(700, 700), gray_scale=False):
     
     img = img / 255.0
     
-    return img
+    if single:
+        return img
+    # return [img]
+    for k in range(4):
+        rotated_img = tf.image.rot90(img, k)
+        images.append(rotated_img)
+
+    return images

@@ -4,14 +4,21 @@ import matplotlib.pyplot as plt
 from hparams import *
 from functions import preprocess_image
 
-# 0 for primary cam
-cap = cv2.VideoCapture(0)
+class MovingAverage:
+    def __init__(self, window_size=5):
+        self.window_size = window_size
+        self.predictions = []
 
-fig, ax = plt.subplots()
-bars = ax.bar(range(1, 6), np.zeros(5), color='blue', width=0.5)
-ax.set_ylim(0, 1)
-plt.ion() # interactive mode on
-plt.show()
+    def update(self, new_prediction):
+        if len(self.predictions) >= self.window_size:
+            self.predictions.pop(0)
+        self.predictions.append(new_prediction)
+
+    def get_average(self):
+        if not self.predictions:
+            return None
+        return np.mean(self.predictions, axis=0)
+
 
 def softmax(x):
     res = []
@@ -24,40 +31,55 @@ def softmax(x):
     return res
 
 def video_interface(model, image_size):
-    while True:
-        ret, frame = cap.read()
+    # 0 for primary cam
+    cap = cv2.VideoCapture(0)
 
-        if not ret:
-            break  # Break the loop if no frame is captured
-        # model_prediction = model.predict(preprocess_image(frame, (image_size, image_size))), batch_size=1)[0]
-        # prediction = np.argmax(model_prediction) + 1
-        prediction = model.predict(
-            np.expand_dims(
-                preprocess_image(frame, (image_size, image_size), gray_scale), 
-                axis=0), verbose=0)[0]
-        
-        prediction = softmax(prediction)
-
-        highest_pred_index = np.argmax(prediction)
-        
-        for i, (bar, pred) in enumerate(zip(bars, prediction)):
-            bar.set_height(pred)
+    # plot to display predictions
+    fig, ax = plt.subplots()
+    bars = ax.bar(range(1, 6), np.zeros(5), color='gray', width=0.5)
+    ax.set_ylim(0, 1)
+    ax.set_xticks(range(1, 6))
+    ax.set_xticklabels(range(1, 6))
+    ax.set_yticklabels([])
+    ax.set_yticks([])
+    plt.show(block=False)
+    
+    prediction_smoothing = MovingAverage(window_size=15)
+    
+    try:
+        while True:
+            # read frame from the camera
+            ret, frame = cap.read()
+            processed_frame = preprocess_image(frame, (image_size, image_size), gray_scale, single=True)
             
-            if i == highest_pred_index:
-                bar.set_color('red')
-            else:
-                bar.set_color('black')
-        
-        fig.canvas.draw()
-        fig.canvas.flush_events()
+            prediction = model.predict(
+                np.expand_dims(processed_frame, axis=0),
+                verbose=0)[0]
+            # prediction = [0.2, np.random.randint(0, 2), 0.2, 0.2, np.random.randint(1, 5)]
 
-        cv2.imshow('Video', frame)
-        
-        # Break the loop if 'q' is pressed
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
+            prediction = softmax(prediction)
 
-    # Release the capture and close the plot
-    cap.release()
-    cv2.destroyAllWindows()
-    plt.close()
+            prediction_smoothing.update(prediction)
+            prediction = prediction_smoothing.get_average()
+
+            highest_pred_index = np.argmax(prediction)
+            for i, (bar, pred) in enumerate(zip(bars, prediction)):
+                bar.set_height(pred)
+                bar.set_color('red' if i == highest_pred_index else 'black')
+            
+            # redraw the plot
+            fig.canvas.draw()
+            fig.canvas.flush_events()
+
+            cv2.imshow(f'Cam ', frame)
+            
+    except Exception as e:
+        print(e)
+    finally:
+        cap.release()
+        cv2.destroyAllWindows()
+        plt.close()
+
+if __name__ == '__main__':
+    video_interface(None, image_size)
+    print("Video Interface Closed (video_inference.py)")

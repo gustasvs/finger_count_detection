@@ -29,6 +29,9 @@ def laod_images(folder_path, target_size=(700, 700)):
             processed_images = preprocess_image(img, target_size, gray_scale)
             for img in processed_images:
                 images.append(img)
+                # show the image
+                # plt.imshow(img)
+                # plt.show()
                 labels.append(np.eye(5)[label - 1]) # example [1, 0, 0, 0, 0]
                 # print(np.eye(5)[label - 1], img.shape)
     
@@ -78,9 +81,11 @@ model = Sequential([
     # MaxPooling2D(pool_size=(2, 2)),
     # Conv2D(256, kernel_size=(3, 3), activation='relu'),
     # MaxPooling2D(pool_size=(2, 2)),
-
-    Dense(256, activation='relu'),
-    Dropout(0.3),
+    # Flatten(),
+    Dense(96, activation='relu'),
+    Dropout(0.5),
+    Dense(64, activation='relu'),
+    Dropout(0.5),
     Dense(5, activation='softmax')
 ])
 

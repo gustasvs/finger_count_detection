@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
+import tensorflow as tf
 from hparams import *
 from functions import preprocess_image
 
@@ -70,9 +71,15 @@ def video_interface(model, image_size):
             # redraw the plot
             fig.canvas.draw()
             fig.canvas.flush_events()
-
-            cv2.imshow(f'Cam ', frame)
             
+
+            # if isinstance(processed_frame, tf.Tensor):
+            #     processed_frame = processed_frame.numpy()  # Convert to NumPy array
+            # if processed_frame.dtype != np.uint8:
+            #     processed_frame = (processed_frame * 255).astype(np.uint8)  # Adjust data type and range
+            
+            cv2.imshow('Cam', frame)
+
     except Exception as e:
         print(e)
     finally:

@@ -1,6 +1,6 @@
 # hparams
-BATCH_SIZE = 8
-EPOCHS = 8
+BATCH_SIZE = 128
+EPOCHS = 1
 LR = 0.01
 
 # image params

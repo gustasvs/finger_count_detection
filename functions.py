@@ -37,41 +37,40 @@ def preprocess_image(img, target_size=(700, 700), gray_scale=False, single=False
             cropped_images.append(cropped_img)
 
     # take out random 1 from the cropped images
-    cropped_images.pop(random.randint(0, 2))
+    if len(cropped_images) > 2:
+        cropped_images.pop(random.randint(0, len(cropped_images) - 1))
+
+
+    # step 2 color jitter images
+    color_jittered_images = []
+    for img in cropped_images:
+        # original image so it's always there
+        color_jittered_images.append(img)
+        for _ in range(2):
+            color_jittered_img = tf.image.random_brightness(img, max_delta=0.2)
+            color_jittered_img = tf.image.random_contrast(color_jittered_img, lower=0.1, upper=0.3)
+            color_jittered_images.append(color_jittered_img)
+
+    # step 3 rotate images
     
     rotated_images = []
-    
-    # step 2 rotate images
-    for img in cropped_images:
+    for img in color_jittered_images:
         rotated_images.append(img)
         rotated_images.append(tf.image.rot90(img, k=1)) # left
         rotated_images.append(tf.image.rot90(img, k=3)) # right
 
-    # step 3 color jitter images
-    color_jittered_images = []
-    for img in rotated_images:
-        # original image so it's always there
-        color_jittered_images.append(img)
-        # optional count of images with color jitter
-        for _ in range(1):
-            color_jittered_img = tf.image.random_brightness(img, 0.3)
-            color_jittered_img = tf.image.random_contrast(color_jittered_img, 0.2, 0.5)
-            if not gray_scale:
-                color_jittered_img = tf.image.random_hue(color_jittered_img, 0.3)
-            color_jittered_images.append(color_jittered_img)
-
-    return color_jittered_images
+    return rotated_images
 
 
 def preprocess_and_save_images(input_folder, output_folder, target_size=(700, 700), gray_scale=False):
     filenames = os.listdir(input_folder)
-    filenames_output = os.listdir(output_folder)
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
-    elif len(filenames_output) > 0:
-        # for filename in os.listdir(output_folder):
-        #     os.remove(os.path.join(output_folder, filename))
-        return len(filenames_output)
+    elif len(os.listdir(output_folder)) > 0:
+        return len(os.listdir(output_folder))
+        for filename in os.listdir(output_folder):
+            os.remove(os.path.join(output_folder, filename))
+        
     
 
     filenames = os.listdir(input_folder)
@@ -86,16 +85,39 @@ def preprocess_and_save_images(input_folder, output_folder, target_size=(700, 70
                 # plt.show()
                 with open(os.path.join(output_folder, f'{filename.split(".")[0]}_{i}.jpg'), 'wb') as f:
                     f.write(tf.image.encode_jpeg(tf.cast(preprocessed_img * 255, tf.uint8)).numpy())
-    return len(filenames)
+    return len(os.listdir(output_folder))
 
 def preprocessed_image_generator(folder_path, batch_size=32):
     while True:  # Loop indefinitely
         image_files = os.listdir(folder_path)  # List all files in the folder
-        random.shuffle(image_files)  # Shuffle to randomize the order for each epoch
+
+        
+        labels = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
+        label_groups = {1: [], 2: [], 3: [], 4: [], 5: []}
+        for filename in image_files:
+            label = int(filename.split('_')[0])
+            labels[label] += 1
+            label_groups[label].append(filename)
+
+        min_label = min(labels.values())
+
+        print(labels)
+
+        # Normalize all groups to the same size (min_label) by undersampling
+        normalized_files = []
+        for label, files in label_groups.items():
+            if len(files) > min_label:
+                files = random.sample(files, min_label)
+            normalized_files.extend(files)
+
+        # Shuffle to randomize the order for each epoch
+        random.shuffle(normalized_files)
+    
+
         batch_images = []
         batch_labels = []
 
-        for filename in image_files:
+        for filename in normalized_files:
             image_path = os.path.join(folder_path, filename)
             img = tf.io.read_file(image_path)
             img = tf.image.decode_jpeg(img, channels=3)  # or 1 for grayscale

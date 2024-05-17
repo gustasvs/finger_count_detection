@@ -3,19 +3,29 @@
 import tensorflow as tf
 import os
 import numpy as np
-import random
 import matplotlib.pyplot as plt
 import sys
 
 # helper imports
-from hparams import BATCH_SIZE, EPOCHS, LR, image_size, gray_scale
+from hparams import BATCH_SIZE, EPOCHS, image_size, gray_scale
 from video_interface import video_interface
 from functions import preprocess_image, preprocess_and_save_images, preprocessed_image_generator
+from model import load_model, create_model
 
 # print-options for less clutter
 np.set_printoptions(suppress=True, precision=2)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 tf.get_logger().setLevel('ERROR')
+
+
+load_not_train = False
+# load_not_train = True
+
+if load_not_train:
+    model = load_model('model.h5')
+    video_interface(model, image_size)
+    sys.exit()
+
 
 input_shape = (image_size, image_size, 1 if gray_scale else 3)
 
@@ -40,48 +50,7 @@ validation_dataset = tf.data.Dataset.from_generator(
 )
 
 # model
-import tensorflow as tf
-from tensorflow import keras
-from keras.models import Sequential
-from keras.layers import Conv2D, Dense, Flatten, Dropout, BatchNormalization, MaxPooling2D, GlobalAveragePooling2D
-from keras.optimizers import Adam
-from tensorflow_addons.metrics import F1Score
-
-from keras.applications.mobilenet_v2 import MobileNetV2
-
-
-base_pretrained_model = MobileNetV2(input_shape=input_shape, include_top=False, weights='imagenet')
-base_pretrained_model.trainable = False
-
-
-model = Sequential([
-    base_pretrained_model,
-    GlobalAveragePooling2D(),
-    
-    # # 1st conv layer
-    # Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=input_shape),
-    # MaxPooling2D(pool_size=(2, 2)),
-    # # more conv layers
-    # Conv2D(128, kernel_size=(3, 3), activation='relu'),
-    # MaxPooling2D(pool_size=(2, 2)),
-    # Conv2D(256, kernel_size=(3, 3), activation='relu'),
-    # MaxPooling2D(pool_size=(2, 2)),
-    
-    # flatten for dense layers
-    Flatten(),
-    
-    # dense layers for classification
-    Dense(256, activation='relu'),
-    Dropout(0.5),
-    # Dense(64, activation='relu'),
-    # Dropout(0.5),
-    Dense(5, activation='softmax')
-])
-
-model.compile(
-              optimizer=Adam(learning_rate=LR, beta_1=0.9, beta_2=0.98, epsilon=1e-9),
-              loss='categorical_crossentropy',
-              metrics=['accuracy', F1Score(num_classes=5, average='macro')])
+model = create_model(input_shape)
 
 
 # train 

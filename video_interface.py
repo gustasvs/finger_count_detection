@@ -31,9 +31,38 @@ def softmax(x):
         res[i] = res[i] / res_max
     return res
 
+def calibrate_background(cap, num_frames=50):
+    """ Capture the background frame """
+    background = None
+    for i in range(num_frames):
+        ret, frame = cap.read()
+        if not ret:
+            continue
+        # Convert frame to grayscale
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        # Smooth to improve mask quality
+        gray = cv2.GaussianBlur(gray, (21, 21), 0)
+        if background is None:
+            background = gray.copy().astype("float")
+            continue
+        # Accumulate the background
+        cv2.accumulateWeighted(gray, background, 0.5)
+    return background
+
+def remove_background(frame, background, threshold=25):
+    """ Remove the background from the frame using the calibrated background """
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    gray = cv2.GaussianBlur(gray, (21, 21), 0)
+    # Compute the difference between the background and current frame
+    diff = cv2.absdiff(cv2.convertScaleAbs(background), gray)
+    _, thresh = cv2.threshold(diff, threshold, 255, cv2.THRESH_BINARY)
+    return thresh
+
 def video_interface(model, image_size):
     # 0 for primary cam
     cap = cv2.VideoCapture(0)
+
+    background = calibrate_background(cap)
 
     # plot to display predictions
     fig, ax = plt.subplots()
@@ -51,12 +80,20 @@ def video_interface(model, image_size):
         while True:
             # read frame from the camera
             ret, frame = cap.read()
+
+            if not ret:
+                continue
+
             processed_frame = preprocess_image(frame, (image_size, image_size), gray_scale, single=True)
             
+            
+
             prediction = model.predict(
                 np.expand_dims(processed_frame, axis=0),
                 verbose=0)[0]
             # prediction = [0.2, np.random.randint(0, 2), 0.2, 0.2, np.random.randint(1, 5)]
+
+            print(prediction)
 
             prediction = softmax(prediction)
 
@@ -73,12 +110,12 @@ def video_interface(model, image_size):
             fig.canvas.flush_events()
             
 
-            # if isinstance(processed_frame, tf.Tensor):
-            #     processed_frame = processed_frame.numpy()  # Convert to NumPy array
-            # if processed_frame.dtype != np.uint8:
-            #     processed_frame = (processed_frame * 255).astype(np.uint8)  # Adjust data type and range
+            if isinstance(processed_frame, tf.Tensor):
+                processed_frame = processed_frame.numpy()  # Convert to NumPy array
+            if processed_frame.dtype != np.uint8:
+                processed_frame = (processed_frame * 255).astype(np.uint8)  # Adjust data type and range
             
-            cv2.imshow('Cam', frame)
+            cv2.imshow('Cam', processed_frame)
 
     except Exception as e:
         print(e)

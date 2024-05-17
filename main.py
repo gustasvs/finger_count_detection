@@ -27,7 +27,7 @@ if load_not_train:
     sys.exit()
 
 
-input_shape = (image_size, image_size, 1 if gray_scale else 3)
+input_shape = (image_size, image_size, 3 if gray_scale else 3)
 
 # Load datasets
 prprocessed_train_len = preprocess_and_save_images('rokas_train', 'rokas_train_preprocessed', target_size=(image_size, image_size), gray_scale=gray_scale)
@@ -41,12 +41,12 @@ print("Preprocessed validation images:", processed_validation_len)
 train_dataset = tf.data.Dataset.from_generator(
     lambda: preprocessed_image_generator('rokas_train_preprocessed', batch_size=BATCH_SIZE),
     output_types=(tf.float32, tf.float32),
-    output_shapes=((None, image_size, image_size, 3), (None, 5))  
+    output_shapes=((None, input_shape[0], input_shape[1], input_shape[2]), (None, 5))  
 )
 validation_dataset = tf.data.Dataset.from_generator(
     lambda: preprocessed_image_generator('rokas_validate_preprocessed', batch_size=BATCH_SIZE),
     output_types=(tf.float32, tf.float32),
-    output_shapes=((None, image_size, image_size, 3), (None, 5))
+    output_shapes=((None, input_shape[0], input_shape[1], input_shape[2]), (None, 5))
 )
 
 # model

@@ -43,6 +43,12 @@ def rotate_images(images):
         # rotated_images.append(tf.image.rot90(img, k=3))
     return rotated_images
 
+def normalize_images(images):
+    mean = tf.constant([0.5, 0.5, 0.5], dtype=tf.float32)
+    std = tf.constant([0.5, 0.5, 0.5], dtype=tf.float32)
+    normalized_images = [(img - mean) / std for img in images]
+    return normalized_images
+
 def preprocess_image(img, target_size=(700, 700), gray_scale=False, single=False):    
     original_shape = tf.cast(tf.shape(img)[:2], tf.float32)
     min_edge = tf.reduce_min(original_shape)
@@ -96,6 +102,7 @@ def preprocess_image(img, target_size=(700, 700), gray_scale=False, single=False
     preprocessed_images = flip_images(preprocessed_images)
     preprocessed_images = color_jitter_images(preprocessed_images)
     preprocessed_images = rotate_images(preprocessed_images)
+    preprocessed_images = normalize_images(preprocessed_images)
 
     return preprocessed_images
 
